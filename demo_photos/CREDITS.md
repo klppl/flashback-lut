@@ -22,3 +22,13 @@ All three are U.S. National Archives DOCUMERICA photographs (1970s, EPA project)
 - License: Public domain
 - Photographer/credit: Erik Calonius
 - Date: May 1973
+
+## Modern digital photos (CC0 / public domain dedication, via Wikimedia Commons)
+
+Chosen as ungraded-looking camera or phone shots. Resized to 1400 px on the long edge.
+
+- **forest.jpg**: "Autumn Forest Path with Tall Trees" by Vovogov90. https://commons.wikimedia.org/wiki/File:Autumn_Forest_Path_with_Tall_Trees.jpg (CC0)
+- **sunset.jpg**: "Sunset clouds over the Caribbean Sea and a wrecked boat at Puerto Viejo de Talamanca, Costa Rica" by Z3lvs. https://commons.wikimedia.org/wiki/File:Sunset_clouds_over_the_Caribbean_Sea_and_a_wrecked_boat_at_Puerto_Viejo_de_Talamanca,_Costa_Rica.jpg (CC0)
+- **portrait.jpg**: "Smiling woman with a phone (Unsplash)" by rawpixel.com. https://commons.wikimedia.org/wiki/File:Smiling_woman_with_a_phone_(Unsplash).jpg (CC0)
+- **market.jpg**: "Busy food court with red tables and picture menus at Chatuchak Weekend Market, Bangkok" by Mussi Katz. https://commons.wikimedia.org/wiki/File:Busy_food_court_with_red_tables_and_picture_menus_at_Chatuchak_Weekend_Market,_Bangkok.jpg (CC0)
+- **night.jpg**: "Petit Champlain at night, Quebec city" by Wilfredor. https://commons.wikimedia.org/wiki/File:Petit_Champlain_at_night,_Quebec_city.jpg (CC0). Edited (HDR-style) by the photographer.
