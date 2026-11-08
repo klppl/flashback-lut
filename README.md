@@ -1,14 +1,23 @@
 # flashback-lut
 
-A browser-based LUT generator for the **Flashback ONE35 V2** camera. Pick a base, shape a look with a handful of film-style controls, and export a `.lut.png` that the Flashback phone app imports.
+An unofficial, browser-based LUT generator for the **Flashback ONE35 V2** camera. Pick a base, shape a look with a handful of film-style controls, and export a `.lut.png` that the Flashback phone app imports.
 
 **Try it: https://klppl.github.io/flashback-lut/**
 
 The camera can't load LUTs; the phone app applies them. This tool only makes the file.
 
+> **Experimental.** The grade is verified (the Python and browser versions match, presets render cleanly), but I haven't yet confirmed that an exported PNG imports in the app, or tuned the looks on real ONE35 V2 photos. If you try one, please [open an issue](https://github.com/klppl/flashback-lut/issues) with what happened.
+
+## How to use
+
+1. Open the page, leave the base on **Classic v12**, pick a preset or hit **Randomize**.
+2. Drag the divider on the demo photo (or **Open photo…** for your own) to compare, and tweak the sliders.
+3. **Export LUT** and save the `.lut.png`.
+4. AirDrop or sync it to your iPhone (Files app) and import it in the Flashback app.
+
 ## What it does
 
-- 16 presets, a seeded **Randomize** (the seed reproduces the look) and **Nudge** for small variations
+- 16 presets (Sodium Dusk, Cold Flash, Cream Halation, Tungsten 800, Fade 400, B&W and more), a seeded **Randomize** (the seed reproduces the look) and **Nudge** for small variations
 - Live before/after slider on demo photos or your own (photos never leave the page)
 - Controls: tone (lift, contrast, pivot, highlight knee, white point), saturation, shadow/mid/highlight split toning, 7-band hue mixer, skin protection
 - Export `.lut.png` (app), `.cube` (Lightroom, DaVinci Resolve, …) and a `.json` preset to keep editing later
@@ -43,28 +52,6 @@ Every look is `grade(base LUT)`. The base (Classic v12 by default) carries the a
 | `custom/` | Built looks |
 | `demo_photos/` | Test photos, credits in `CREDITS.md` |
 | `docs/camera-notes.md` | Reverse-engineering notes on the camera and app |
-
-## Develop
-
-```bash
-pip install -r requirements.txt
-python tools/build_luts.py && python tools/validate.py   # custom/ looks + checks
-python tools/build_generator.py                          # lut_lab.html
-python tools/build_generator.py --public                 # site/index.html (what Pages serves)
-```
-
-Serve the page over HTTP (`python -m http.server`); `file://` blocks the demo photos in some browsers.
-
-Rules for changes to the grade:
-- Keep Python (`build_luts.py`) and JS (`tone()` / `grade()`) producing the same LUT for the same params.
-- Clamp tone output to 0..1 before applying powers.
-- After a template edit, rebuild and commit `lut_lab.html` too.
-
-Pushes to `main` that touch `tools/`, `luts/` or `demo_photos/` deploy to GitHub Pages via `.github/workflows/pages.yml`. For a page without the app's base LUTs, build with `--public --no-bases`.
-
-## Status
-
-The Python and JS grades match, presets render without bad values, and the randomizer is reproducible. **Not yet verified:** importing an exported PNG into the app, and looks on real camera photos.
 
 ## Contributing
 

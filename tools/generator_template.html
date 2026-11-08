@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ONE35 LUT Lab</title>
+<meta name="description" content="Free, open-source LUT generator for the Flashback ONE35 V2 camera. Build film looks in your browser and export a .lut.png for the Flashback app, or a .cube for Lightroom and DaVinci Resolve.">
+<meta name="theme-color" content="#121214">
+<meta property="og:title" content="ONE35 LUT Lab">
+<meta property="og:description" content="Build film looks for the Flashback ONE35 V2 in your browser. Exports .lut.png for the app and .cube. Open source.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23121214'/%3E%3Ccircle cx='12' cy='13' r='7' fill='%23e23b3b' fill-opacity='.85'/%3E%3Ccircle cx='20' cy='13' r='7' fill='%233fae49' fill-opacity='.85'/%3E%3Ccircle cx='16' cy='20' r='7' fill='%233560e8' fill-opacity='.85'/%3E%3C/svg%3E">
 <style>
   :root{--bg:#121214;--panel:#1b1b1f;--line:#2c2c33;--tx:#e8e8ea;--mut:#8d8d98;--acc:#ffb24a}
   *{box-sizing:border-box}
@@ -16,23 +22,25 @@
   #desc{margin-top:6px;height:2.8em;line-height:1.4;overflow:hidden}
   main{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:0;min-height:calc(100vh - 56px)}
   @media(max-width:900px){main{grid-template-columns:1fr}}
-  .view{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
-  .stage{position:relative;background:#000;border:1px solid var(--line);border-radius:8px;display:flex;justify-content:center;align-items:center;min-height:300px;overflow:hidden}
+  .view{padding:14px 20px;display:flex;flex-direction:column;gap:10px;height:calc(100vh - 56px);min-height:0}
+  .stage{position:relative;background:#000;border:1px solid var(--line);border-radius:8px;display:flex;justify-content:center;align-items:center;flex:1 1 0;min-height:200px;overflow:hidden}
   #cmp{position:relative;line-height:0;touch-action:none;cursor:ew-resize;user-select:none}
   #split{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:#fff;box-shadow:0 0 4px #000a;pointer-events:none}
   #knob{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;color:#111;border-radius:14px;padding:5px 8px;font:700 12px/1 system-ui;letter-spacing:2px;box-shadow:0 1px 6px #0009}
   .tag{position:absolute;top:8px;font:600 11px/1 system-ui;background:#000a;color:#fff;padding:4px 7px;border-radius:4px;pointer-events:none}
   .tag.l{left:8px}.tag.r{right:8px}
-  canvas#out{max-width:100%;max-height:max(240px,calc(100vh - 260px));display:block}
+  canvas#out{max-width:100%;max-height:100%;display:block}
+  #cmp{max-width:100%;max-height:100%}
   #thumbs button{padding:0;border:2px solid transparent;border-radius:4px;overflow:hidden;line-height:0;background:none}
   #thumbs button.on{border-color:var(--acc,#e8a33d)}
   #thumbs img{width:52px;height:36px;object-fit:cover;display:block}
   .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   button,select{background:var(--panel);color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:7px 11px;font:inherit;cursor:pointer}
   button:hover{border-color:#555}
+  :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
   button.pri{background:var(--acc);color:#1a1100;border-color:var(--acc);font-weight:600}
   aside{border-left:1px solid var(--line);background:var(--panel);padding:10px 14px;overflow:auto;max-height:calc(100vh - 56px)}
-  @media(max-width:900px){aside{max-height:none;border-left:0;border-top:1px solid var(--line)}}
+  @media(max-width:900px){aside{max-height:none;border-left:0;border-top:1px solid var(--line)}.view{height:auto}.stage{flex:none;min-height:0}canvas#out{max-height:60vh}}
   fieldset{border:0;margin:6px 0 0;padding:0}
   fieldset.closed>div{display:none}
   button.hd{display:flex;width:100%;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:6px;background:#ffffff08;border:1px solid var(--line);color:var(--acc);font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600}
@@ -44,8 +52,11 @@
     .s{display:grid;grid-template-columns:96px 1fr 44px;gap:8px;align-items:center;margin:1px 0}
   .s label{color:var(--mut)}
   .s output{text-align:right;font-variant-numeric:tabular-nums;color:var(--mut)}
-  input[type=range]{width:100%;accent-color:var(--acc)}
-  .hue{display:grid;grid-template-columns:62px 1fr 1fr;gap:6px;align-items:center;margin:0}
+  input[type=number]{-moz-appearance:textfield}input[type=number]::-webkit-inner-spin-button{display:none}
+  input[type=range]{width:100%;margin:0;accent-color:var(--acc)}
+  .hue{display:grid;grid-template-columns:78px minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:center;margin:0}
+  .hue>span{white-space:nowrap}
+  .hue.hh2{color:var(--mut);font-size:11px;margin:2px 0 0}.hue.hh2 span:not(:first-child){text-align:center}
   .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
   .hh{color:var(--mut);font-size:11px}
   .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -157,7 +168,7 @@
 <main>
   <section class="view">
     <div class="row">
-      <button id="open">Open photo…</button>
+      <button id="open" title="Or drop an image onto the preview">Open photo…</button>
       <input type="file" id="file" accept="image/*" hidden>
       <button id="prev" title="Previous demo (←)">‹</button>
       <button id="next" title="Next demo (→)">›</button>
@@ -209,7 +220,8 @@
     <div class="row" style="margin-top:8px">
       <button id="rand" class="pri">🎲 Randomize</button>
       <button id="nudge" title="Small random variation of the current look">Nudge</button>
-      <label class="note" style="display:flex;gap:6px;align-items:center">Seed <input id="seed" type="number" style="width:92px;background:#111;color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:5px"></label>
+      <button id="reset" title="Back to the selected preset's settings">Reset</button>
+      <label class="note" style="display:flex;gap:6px;align-items:center">Seed <input id="seed" type="number" placeholder="random" style="width:92px;background:#111;color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:5px"></label>
     </div>
 
     <fieldset><legend>Tone</legend>
@@ -221,8 +233,8 @@
     <fieldset><legend>Split toning</legend>
       <div id="g-split"></div>
     </fieldset>
-    <fieldset><legend>Hue mixer (saturation | hue shift)</legend>
-      <div id="g-hue"></div>
+    <fieldset><legend>Hue mixer</legend>
+      <div id="g-hue"><div class="hue hh2"><span></span><span>Saturation</span><span>Hue shift</span></div></div>
     </fieldset>
 
   </aside>
@@ -420,8 +432,10 @@ function makeSlider(host, key, label, min, max, step) {
   const inp = row.querySelector("input"), out = row.querySelector("output");
   inp.addEventListener("input", () => { P[key] = +inp.value; out.textContent = (+inp.value).toFixed(step < 0.01 ? 3 : step < 1 ? 2 : 0); schedule(); });
   row._sync = () => { inp.value = P[key]; out.textContent = (+P[key]).toFixed(step < 0.01 ? 3 : step < 1 ? 2 : 0); };
+  row.querySelector("label").title = "Double-click to reset"; row.querySelector("label").addEventListener("dblclick", () => { P[key] = presetVal(key); row._sync(); schedule(); });
   host.appendChild(row); return row;
 }
+const presetVal = key => { const v = (PRESETS[$("preset").value] || {})[key]; return v !== undefined ? v : DEFAULT[key]; };
 const syncs = [];
 for (const [grp, list] of Object.entries(SLIDERS)) for (const x of list) syncs.push(makeSlider($("g-" + grp), ...x));
 HUES.forEach(([nm, , col], i) => {
@@ -431,6 +445,7 @@ HUES.forEach(([nm, , col], i) => {
   gi.addEventListener("input", () => { P.gain[i] = +gi.value; schedule(); });
   ri.addEventListener("input", () => { P.rot[i] = +ri.value; schedule(); });
   row._sync = () => { gi.value = P.gain[i]; ri.value = P.rot[i]; };
+  row.firstElementChild.title = "Double-click to reset"; row.firstElementChild.addEventListener("dblclick", () => { const pr = PRESETS[$("preset").value] || {}; P.gain[i] = (pr.gain || [])[i] || 0; P.rot[i] = (pr.rot || [])[i] || 0; row._sync(); schedule(); });
   $("g-hue").appendChild(row); syncs.push(row);
 });
 const syncAll = () => syncs.forEach(r => r._sync());
@@ -442,6 +457,7 @@ $("preset").value = "Sodium Dusk";
 function setPreset(nm) { P = Object.assign(JSON.parse(JSON.stringify(DEFAULT)), JSON.parse(JSON.stringify(PRESETS[nm]))); syncAll(); schedule();
   $("desc").textContent = DESC[nm] || ""; $("name").value = nm.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""); }
 $("preset").addEventListener("change", e => setPreset(e.target.value));
+$("reset").onclick = () => setPreset($("preset").value);
 $("base").addEventListener("change", e => loadBase(e.target.value));
 { const t = $("baseTip"), h = $("baseHelp"), set = o => { t.hidden = !o; h.setAttribute("aria-expanded", o); };
   h.onclick = e => { e.stopPropagation(); set(t.hidden); };
@@ -551,10 +567,14 @@ function showDemo(k) {
   i.onerror = () => { $("msg").textContent = "Photo not found (needs demo_photos/ next to this page, served over http)"; if (demoIdx === 0) demoImage(); };
   i.src = src;
 }
-DEMOS.forEach(([nm, src], j) => { const t = document.createElement("button"); t.title = nm; t.innerHTML = src ? `<img src="${src}" alt="${nm}">` : `<span style="display:block;width:52px;height:36px;line-height:36px;font-size:11px;text-align:center">Chart</span>`; t.onclick = () => showDemo(j); $("thumbs").appendChild(t); });
+DEMOS.forEach(([nm, src], j) => { const t = document.createElement("button"); t.title = nm; t.innerHTML = src ? `<img src="${src}" alt="${nm}">` : `<span style="display:block;width:52px;height:36px;line-height:36px;font-size:11px;text-align:center;color:var(--mut);background:linear-gradient(90deg,#000,#fff) 0 0/100% 40% no-repeat,linear-gradient(90deg,#e23b3b,#f1d84a,#3fae49,#2ac4c4,#3560e8,#e449a8) 0 100%/100% 40% no-repeat,#1b1b1f"></span>`; t.onclick = () => showDemo(j); $("thumbs").appendChild(t); });
 $("prev").onclick = () => showDemo(demoIdx - 1); $("next").onclick = () => showDemo(demoIdx + 1);
 window.addEventListener("keydown", e => { if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return; if (e.key === "ArrowLeft") showDemo(demoIdx - 1); if (e.key === "ArrowRight") showDemo(demoIdx + 1); });
 $("open").onclick = () => $("file").click();
+{ const st = document.querySelector(".stage"), load = f => { if (!f || !/^image\//.test(f.type)) return; const u = URL.createObjectURL(f), i = new Image(); i.onload = () => { setImage(i); URL.revokeObjectURL(u); [...$("thumbs").children].forEach(t => t.classList.remove("on")); }; i.src = u; };
+  st.addEventListener("dragover", e => { e.preventDefault(); st.style.borderColor = "var(--acc)"; });
+  st.addEventListener("dragleave", () => { st.style.borderColor = ""; });
+  st.addEventListener("drop", e => { e.preventDefault(); st.style.borderColor = ""; load(e.dataTransfer.files[0]); }); }
 $("file").onchange = e => { const f = e.target.files[0]; if (!f) return; const u = URL.createObjectURL(f); const i = new Image(); i.onload = () => { setImage(i); URL.revokeObjectURL(u); }; i.src = u; };
 { const cmp = $("cmp"); let drag = false;
   const move = e => { const r = outC.getBoundingClientRect(); splitPos = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); drawSplit(); };
