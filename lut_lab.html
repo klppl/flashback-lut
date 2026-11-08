@@ -47,6 +47,9 @@
       <button id="open">Open photo…</button>
       <input type="file" id="file" accept="image/*" hidden>
       <button id="demo">Demo chart</button>
+      <button class="ph" data-src="demo_photos/beach.jpg">Beach</button>
+      <button class="ph" data-src="demo_photos/city.jpg">City</button>
+      <button class="ph" data-src="demo_photos/party.jpg">Party</button>
       <button id="hold" title="Hold to see the base look without your grade">Hold: base only</button>
       <span style="flex:1"></span>
       <span class="note" id="msg"></span>
@@ -62,6 +65,8 @@
   <aside>
     <div class="row">
       <select id="base" title="Starting LUT"></select>
+      <button id="loadBase" title="Use a 512x512 .lut.png as the base, e.g. one of the Flashback app's own looks">Load base…</button>
+      <input type="file" id="baseFile" accept="image/png" hidden>
       <select id="preset" title="Preset"></select>
     </div>
     <div class="note" id="desc" style="margin-top:6px"></div>
@@ -312,6 +317,17 @@ function setPreset(nm) { P = Object.assign(JSON.parse(JSON.stringify(DEFAULT)), 
   $("desc").textContent = DESC[nm] || ""; $("name").value = nm.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""); }
 $("preset").addEventListener("change", e => setPreset(e.target.value));
 $("base").addEventListener("change", e => loadBase(e.target.value));
+$("loadBase").onclick = () => $("baseFile").click();
+$("baseFile").onchange = e => { const f = e.target.files[0]; if (!f) return;
+  const rd = new FileReader(); rd.onload = async () => {
+    const im = new Image(); im.onload = async () => {
+      if (im.width !== 512 || im.height !== 512) { $("msg").textContent = "Base must be a 512×512 .lut.png"; return; }
+      BASES.custom = { label: f.name.replace(/\.lut\.png$|\.png$/i, ""), uri: rd.result };
+      let o = [...$("base").options].find(x => x.value === "custom");
+      if (!o) { o = document.createElement("option"); o.value = "custom"; $("base").appendChild(o); }
+      o.textContent = "Base: " + BASES.custom.label; $("base").value = "custom"; await loadBase("custom");
+    }; im.src = rd.result; };
+  rd.readAsDataURL(f); e.target.value = ""; };
 
 function loadBase(id) {
   return new Promise(res => {
@@ -382,6 +398,7 @@ function demoImage() {
   const img = new Image(); img.onload = () => setImage(img); img.src = c.toDataURL();
 }
 $("demo").onclick = demoImage;
+document.querySelectorAll(".ph").forEach(b => b.onclick = () => { const i = new Image(); i.onload = () => setImage(i); i.onerror = () => { $("msg").textContent = "Photo not found (needs demo_photos/ next to this page, served over http)"; }; i.src = b.dataset.src; });
 $("open").onclick = () => $("file").click();
 $("file").onchange = e => { const f = e.target.files[0]; if (!f) return; const u = URL.createObjectURL(f); const i = new Image(); i.onload = () => { setImage(i); URL.revokeObjectURL(u); }; i.src = u; };
 const holdOn = v => () => { hold = v; schedule(); };

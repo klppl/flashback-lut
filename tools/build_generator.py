@@ -10,10 +10,10 @@ bases = {
     "retrohaze": ("Retro Haze", "luts/purpleorangeretrohazev2.lut.png"),
     "disposable": ("Disposable", "luts/rawed_disposable_evm0.75.lut.png"),
 }
-# --public: identity base only, written to site/index.html (for GitHub Pages).
-# The app's own LUTs are Flashback's files, so the public build does not embed them.
+# --public: write to site/index.html (for GitHub Pages) instead of lut_lab.html.
+# --no-bases: embed only the identity base (the app's own LUTs are Flashback's files).
 PUBLIC = "--public" in sys.argv
-if PUBLIC:
+if "--no-bases" in sys.argv:
     bases = {}
 out = {}
 for k, (label, p) in bases.items():
@@ -26,6 +26,8 @@ if PUBLIC:
     os.makedirs(os.path.join(R, "site"), exist_ok=True)
     dest = os.path.join("site", "index.html")
     open(os.path.join(R, "site", ".nojekyll"), "w").close()
+    import shutil
+    shutil.copytree(os.path.join(R, "demo_photos"), os.path.join(R, "site", "demo_photos"), dirs_exist_ok=True)
 else:
     dest = "lut_lab.html"
 open(os.path.join(R, dest), "w").write(html)

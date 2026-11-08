@@ -8,7 +8,7 @@ Open `lut_lab.html` in a browser. Pick a base and preset (or hit Randomize), twe
 
 ## GitHub Pages
 
-`.github/workflows/pages.yml` builds `python tools/build_generator.py --public` and deploys `site/` on every push to `main` that touches `tools/`. The public build embeds only the identity base (33 KB page), not Flashback's own LUTs in `luts/`. To turn it on: repo Settings → Pages → Source: **GitHub Actions**. The full 6 MB `lut_lab.html` stays local.
+`.github/workflows/pages.yml` builds `python tools/build_generator.py --public` and deploys `site/` on every push to `main` that touches `tools/`, `luts/` or `demo_photos/`. The public page embeds the app's base LUTs from `luts/` (about 6 MB; they are Flashback's files, so the site republishes them). For an identity-only page, build with `--public --no-bases`. To turn it on: repo Settings → Pages → Source: **GitHub Actions**.
 
 ## Rebuild
 
