@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+.DS_Store
+# regenerable (python tools/build_luts.py), ~7 MB each
+*.cube
+site/

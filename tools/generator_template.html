@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ONE35 LUT Lab</title>
+<style>
+  :root{--bg:#121214;--panel:#1b1b1f;--line:#2c2c33;--tx:#e8e8ea;--mut:#8d8d98;--acc:#ffb24a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+  header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
+  h1{font-size:16px;margin:0;letter-spacing:.04em}
+  .note{color:var(--mut);font-size:12px}
+  main{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:0;min-height:calc(100vh - 54px)}
+  @media(max-width:900px){main{grid-template-columns:1fr}}
+  .view{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+  .stage{background:#000;border:1px solid var(--line);border-radius:8px;display:flex;justify-content:center;align-items:center;min-height:300px;overflow:hidden}
+  canvas#out{max-width:100%;max-height:70vh;display:block}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  button,select{background:var(--panel);color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:7px 11px;font:inherit;cursor:pointer}
+  button:hover{border-color:#555}
+  button.pri{background:var(--acc);color:#1a1100;border-color:var(--acc);font-weight:600}
+  aside{border-left:1px solid var(--line);background:var(--panel);padding:14px 16px;overflow:auto;max-height:calc(100vh - 54px)}
+  @media(max-width:900px){aside{max-height:none;border-left:0;border-top:1px solid var(--line)}}
+  fieldset{border:0;border-top:1px solid var(--line);margin:12px 0 0;padding:10px 0 0}
+  legend{padding:0 6px 0 0;color:var(--acc);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+  .s{display:grid;grid-template-columns:96px 1fr 44px;gap:8px;align-items:center;margin:4px 0}
+  .s label{color:var(--mut)}
+  .s output{text-align:right;font-variant-numeric:tabular-nums;color:var(--mut)}
+  input[type=range]{width:100%;accent-color:var(--acc)}
+  .hue{display:grid;grid-template-columns:62px 1fr 1fr;gap:6px;align-items:center;margin:3px 0}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+  .hh{color:var(--mut);font-size:11px}
+  #msg{color:var(--mut);font-size:12px;min-height:16px}
+  .strip{display:flex;gap:10px;flex-wrap:wrap}
+  .strip canvas{border:1px solid var(--line);border-radius:4px;background:#000}
+</style>
+</head>
+<body>
+<header>
+  <h1>ONE35 LUT LAB</h1>
+  <span class="note">Builds Flashback-format LUTs (512×512 PNG, 64³). The app applies LUTs on the phone, not in the camera. AirDrop the PNG to the Files app and import it in the app.</span>
+</header>
+<main>
+  <section class="view">
+    <div class="row">
+      <button id="open">Open photo…</button>
+      <input type="file" id="file" accept="image/*" hidden>
+      <button id="demo">Demo chart</button>
+      <button id="hold" title="Hold to see the base look without your grade">Hold: base only</button>
+      <span style="flex:1"></span>
+      <span class="note" id="msg"></span>
+    </div>
+    <div class="stage"><canvas id="out"></canvas></div>
+    <div class="strip">
+      <div><div class="note">Neutral ramp (base → yours)</div><canvas id="ramp" width="360" height="48"></canvas></div>
+      <div><div class="note">Hue chart (base → yours)</div><canvas id="chart" width="360" height="48"></canvas></div>
+    </div>
+    <div class="note">Tip: preview is trilinear on a 33³ grid for speed; export uses the full 64³ grid. Photos you open never leave this page.</div>
+  </section>
+
+  <aside>
+    <div class="row">
+      <select id="base" title="Starting LUT"></select>
+      <select id="preset" title="Preset"></select>
+    </div>
+    <div class="note" id="desc" style="margin-top:6px"></div>
+    <div class="row" style="margin-top:8px">
+      <button id="rand" class="pri">🎲 Randomize</button>
+      <button id="nudge" title="Small random variation of the current look">Nudge</button>
+      <label class="note" style="display:flex;gap:6px;align-items:center">Seed <input id="seed" type="number" style="width:92px;background:#111;color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:5px"></label>
+    </div>
+
+    <fieldset><legend>Tone</legend>
+      <div id="g-tone"></div>
+    </fieldset>
+    <fieldset><legend>Colour</legend>
+      <div id="g-col"></div>
+    </fieldset>
+    <fieldset><legend>Split toning</legend>
+      <div id="g-split"></div>
+    </fieldset>
+    <fieldset><legend>Hue mixer (saturation | hue shift)</legend>
+      <div id="g-hue"></div>
+    </fieldset>
+
+    <fieldset><legend>Export</legend>
+      <div class="s" style="grid-template-columns:96px 1fr"><label>Name</label><input id="name" value="my_look" style="background:#111;color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:6px"></div>
+      <div class="row" style="margin-top:8px">
+        <button class="pri" id="expPng">Save .lut.png (app)</button>
+        <button id="expCube">Save .cube</button>
+        <button id="expJson">Save preset</button>
+        <button id="impJson">Load preset</button>
+        <input type="file" id="jsonFile" accept=".json" hidden>
+      </div>
+    </fieldset>
+  </aside>
+</main>
+
+<script>
+/*BASES*/
+const N = 64;
+// ---------- colour math (OKLab) ----------
+const D2R = Math.PI / 180;
+const s2l = c => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+const l2s = c => { c = Math.max(c, 0); return c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055; };
+function toOk(r, g, b) {
+  r = s2l(r); g = s2l(g); b = s2l(b);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+          1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+          0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
+}
+function okLin(L, a, b) {
+  let l = L + 0.3963377774 * a + 0.2158037573 * b;
+  let m = L - 0.1055613458 * a - 0.0638541728 * b;
+  let s = L - 0.0894841775 * a - 1.2914855480 * b;
+  l = l * l * l; m = m * m * m; s = s * s * s;
+  return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+          -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+          -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s];
+}
+const fits = (L, a, b, k) => { const c = okLin(L, a * k, b * k), e = 2e-4;
+  return c[0] >= -e && c[0] <= 1 + e && c[1] >= -e && c[1] <= 1 + e && c[2] >= -e && c[2] <= 1 + e; };
+function gamutMap(L, a, b) {
+  L = Math.min(1, Math.max(0, L));
+  let best = 1;
+  if (!fits(L, a, b, 1)) {
+    let prev = 1; best = 0;
+    for (let i = 1; i <= 40; i++) { const k = 1 - i / 40; if (fits(L, a, b, k)) { best = k; break; } prev = k; }
+    let lo = best, hi = prev;
+    for (let i = 0; i < 10; i++) { const mid = (lo + hi) / 2; if (fits(L, a, b, mid)) lo = mid; else hi = mid; }
+    best = lo;
+  }
+  const c = okLin(L, a * best, b * best);
+  return [l2s(c[0]), l2s(c[1]), l2s(c[2])].map(v => Math.min(1, Math.max(0, v)));
+}
+const smoother = x => { x = Math.min(1, Math.max(0, x)); return x * x * x * (x * (x * 6 - 15) + 10); };
+const gaussH = (h, c, w) => { let d = (h - c * D2R + Math.PI) % (2 * Math.PI); if (d < 0) d += 2 * Math.PI; d -= Math.PI; return Math.exp(-0.5 * (d / (w * D2R)) ** 2); };
+
+// ---------- parameters ----------
+const HUES = [["Red", 29, "#ff5a4d"], ["Orange", 55, "#ff9a3c"], ["Yellow", 110, "#f1d84a"], ["Green", 142, "#5ccf55"],
+              ["Cyan", 195, "#3fd6d0"], ["Blue", 264, "#4a74ff"], ["Magenta", 328, "#e449c8"]];
+const SLIDERS = {
+  tone: [["lift", "Black lift", 0, 0.2, 0.005], ["contrast", "Contrast", -0.5, 1.2, 0.01], ["pivot", "Pivot", 0.3, 0.85, 0.01],
+         ["knee", "Highlight knee", 0.5, 0.95, 0.01], ["white", "White point", 0.9, 1.0, 0.001]],
+  col: [["sat", "Saturation", 0, 1.6, 0.01]],
+  split: [["shHue", "Shadow hue°", 0, 360, 1], ["shAmt", "Shadow amount", 0, 0.05, 0.001],
+          ["miHue", "Mid hue°", 0, 360, 1], ["miAmt", "Mid amount", 0, 0.03, 0.001],
+          ["hiHue", "Highlight hue°", 0, 360, 1], ["hiAmt", "Highlight amount", 0, 0.05, 0.001],
+          ["skin", "Protect skin", 0, 1, 0.01]]
+};
+const DEFAULT = { lift: 0, contrast: 0, pivot: 0.62, knee: 0.9, white: 1, sat: 1, shHue: 220, shAmt: 0, miHue: 0, miAmt: 0, hiHue: 70, hiAmt: 0, skin: 0.6,
+                  gain: [0, 0, 0, 0, 0, 0, 0], rot: [0, 0, 0, 0, 0, 0, 0] };
+const DESC = {
+  "Neutral (base only)": "The chosen base LUT with no grade.",
+  "Sodium Dusk": "Teal shadows, amber highlights. Golden hour and street lamps.",
+  "Cold Flash": "Blue-cyan shadows, pink-peach highlights. Night flash.",
+  "Cream Halation": "Soft, matte, cream highlights, reds glow orange.",
+  "Ice Bath": "Cold and clean: cyan shadows, muted greens. Good for overcast days.",
+  "Ember": "Warm, contrasty, red-brown shadows. Evening and candlelight.",
+  "Portrait 400": "Pastel, gentle contrast, protected peachy skin. Faces and daylight.",
+  "Emerald 400": "Green-cyan shadows, lush greens, pink-leaning magentas. Travel and street.",
+  "Vivid 100": "Saturated, punchy, deep blues and reds. Bright sun.",
+  "Tungsten 800": "Teal shadows, orange highlights, reds glow. Night street and neon.",
+  "Summer Slide": "Warm yellows, rich reds, deep blues. Holiday slide-film feel.",
+  "Fade 400": "Lifted blacks, green-yellow cast, low saturation. Old drugstore print.",
+  "Cross Lab": "Cross-processed: blue shadows, yellow-green highlights, high contrast.",
+  "Grit 400 (B&W)": "Hard-contrast black and white with a hint of cool shadow.",
+  "Silver Tone (B&W)": "Soft toned black and white, brown shadows, cream highlights.",
+  "Instant Fade": "Instant-print mood: faded, cyan shadows, cream-yellow highlights."
+};
+const PRESETS = {
+  "Neutral (base only)": {},
+  "Sodium Dusk": { lift: 0.05, contrast: 0.55, pivot: 0.62, knee: 0.80, white: 0.995, sat: 1.05, shHue: 222, shAmt: 0.015, hiHue: 79, hiAmt: 0.031, skin: 0.75,
+                   gain: [0, 0.10, 0.06, 0, 0.10, 0.12, 0], rot: [0, 0, 0, -9, 0, -8, 0] },
+  "Cold Flash": { lift: 0.07, contrast: 0.70, pivot: 0.62, knee: 0.78, white: 0.995, sat: 1.08, shHue: 252, shAmt: 0.032, miHue: 315, miAmt: 0.006, hiHue: 27, hiAmt: 0.022, skin: 0.85,
+                  gain: [0.06, 0, 0, 0, 0.08, 0, 0.16], rot: [0, 0, -5, -14, 0, 0, 0] },
+  "Cream Halation": { lift: 0.10, contrast: 0.20, pivot: 0.62, knee: 0.76, white: 0.992, sat: 0.90, shHue: 63, shAmt: 0.009, miHue: 90, miAmt: 0.004, hiHue: 83, hiAmt: 0.024, skin: 0.5,
+                      gain: [0.20, 0.12, 0, -0.18, 0, -0.10, 0], rot: [6, 0, 0, 0, 0, 0, 0] },
+  "Ice Bath": { lift: 0.04, contrast: 0.45, pivot: 0.6, knee: 0.8, white: 0.99, sat: 0.92, shHue: 235, shAmt: 0.02, hiHue: 215, hiAmt: 0.012, skin: 0.8,
+                gain: [0, 0.04, -0.1, -0.2, 0.18, 0.1, 0], rot: [0, 0, 0, 10, 0, 0, 0] },
+  "Ember": { lift: 0.03, contrast: 0.65, pivot: 0.58, knee: 0.74, white: 0.99, sat: 1.12, shHue: 25, shAmt: 0.02, hiHue: 70, hiAmt: 0.028, skin: 0.4,
+             gain: [0.15, 0.1, 0, -0.1, -0.15, -0.1, 0], rot: [0, 0, 0, -6, 0, 0, 0] },
+  "Portrait 400": { lift: 0.07, contrast: 0.18, pivot: 0.62, knee: 0.72, white: 0.99, sat: 0.93, shHue: 185, shAmt: 0.008, miHue: 55, miAmt: 0.006, hiHue: 60, hiAmt: 0.016, skin: 0.9,
+                    gain: [0.05, 0.08, -0.05, -0.12, -0.05, -0.08, 0], rot: [0, 0, 0, 5, 0, 0, 0] },
+  "Emerald 400": { lift: 0.04, contrast: 0.5, pivot: 0.6, knee: 0.78, white: 0.995, sat: 1.08, shHue: 175, shAmt: 0.016, miHue: 150, miAmt: 0.004, hiHue: 95, hiAmt: 0.012, skin: 0.6,
+                   gain: [0.04, 0, 0.04, 0.22, 0.05, 0.05, 0.1], rot: [0, 0, 0, 6, 0, 0, -4] },
+  "Vivid 100": { lift: 0.01, contrast: 0.75, pivot: 0.6, knee: 0.8, white: 1, sat: 1.22, shHue: 250, shAmt: 0.006, hiHue: 70, hiAmt: 0.008, skin: 0.7,
+                 gain: [0.12, 0.08, 0.04, 0.06, 0.08, 0.14, 0.05], rot: [0, 0, 0, 0, 0, 0, 0] },
+  "Tungsten 800": { lift: 0.06, contrast: 0.5, pivot: 0.6, knee: 0.7, white: 0.985, sat: 1.0, shHue: 215, shAmt: 0.026, miHue: 240, miAmt: 0.006, hiHue: 55, hiAmt: 0.026, skin: 0.6,
+                    gain: [0.2, 0.12, 0, -0.12, 0.1, 0.05, 0], rot: [8, 0, 0, 0, 0, 0, 0] },
+  "Summer Slide": { lift: 0.02, contrast: 0.62, pivot: 0.58, knee: 0.78, white: 0.99, sat: 1.1, shHue: 40, shAmt: 0.008, miHue: 70, miAmt: 0.006, hiHue: 85, hiAmt: 0.02, skin: 0.55,
+                    gain: [0.2, 0.1, 0.05, -0.1, -0.05, 0.12, -0.05], rot: [0, 0, 0, -4, 0, -3, 0] },
+  "Fade 400": { lift: 0.13, contrast: 0.15, pivot: 0.6, knee: 0.7, white: 0.975, sat: 0.8, shHue: 190, shAmt: 0.016, miHue: 120, miAmt: 0.006, hiHue: 100, hiAmt: 0.02, skin: 0.5,
+                gain: [0, 0.05, 0.1, 0.08, 0, -0.1, -0.1], rot: [0, 0, 0, -8, 0, 0, 0] },
+  "Cross Lab": { lift: 0.05, contrast: 0.85, pivot: 0.58, knee: 0.8, white: 1, sat: 1.2, shHue: 235, shAmt: 0.03, miHue: 330, miAmt: 0.008, hiHue: 105, hiAmt: 0.035, skin: 0.25,
+                 gain: [0.1, 0, 0.12, 0.15, 0.12, 0.1, 0.2], rot: [0, 0, 0, -14, 0, 10, -6] },
+  "Grit 400 (B&W)": { lift: 0.015, contrast: 1.0, pivot: 0.56, knee: 0.82, white: 1, sat: 0, shHue: 250, shAmt: 0.004, hiHue: 80, hiAmt: 0.005, skin: 0 },
+  "Silver Tone (B&W)": { lift: 0.05, contrast: 0.3, pivot: 0.6, knee: 0.75, white: 0.985, sat: 0, shHue: 60, shAmt: 0.012, miHue: 45, miAmt: 0.004, hiHue: 85, hiAmt: 0.02, skin: 0 },
+  "Instant Fade": { lift: 0.11, contrast: 0.25, pivot: 0.62, knee: 0.7, white: 0.975, sat: 0.86, shHue: 200, shAmt: 0.02, miHue: 330, miAmt: 0.006, hiHue: 95, hiAmt: 0.026, skin: 0.7,
+                    gain: [0.05, 0.05, 0.08, -0.05, -0.1, -0.12, 0.1], rot: [0, 0, 0, -6, 0, 0, 0] }
+};
+let P = JSON.parse(JSON.stringify(DEFAULT));
+let baseData = null, baseId = null;     // base LUT as Float32Array [b][g][r][3] size 64
+let hold = false;
+
+// ---------- the grade ----------
+function tone(L0) {
+  const L1 = L0 + P.lift * (1 - L0) ** 3;
+  const L2 = L1 + P.contrast * 3 * L1 * (1 - L1) * (L1 - P.pivot);
+  const knee = P.knee;
+  if (L2 <= knee) return L2;
+  // shoulder: slope 1 at the knee, input 1.0 lands exactly on the white point
+  const t = (L2 - knee) / (1 - knee), rho = Math.max(0.5, (P.white - knee) / (1 - knee));
+  return knee + (1 - knee) * (t - (1 - rho) * t * t);
+}
+function grade(r, g, b) {
+  const [L0, a, bb] = toOk(r, g, b);
+  const C = Math.hypot(a, bb), h = Math.atan2(bb, a);
+  const L1 = Math.min(1, Math.max(0, tone(L0)));
+  let gain = 1;
+  for (let i = 0; i < 7; i++) if (P.gain[i]) gain += P.gain[i] * gaussH(h, HUES[i][1], 30);
+  const fade = 1 - smoother((C - 0.14) / 0.16);
+  const sf = P.sat * gain;
+  let C1 = C * (sf < 1 ? sf : 1 + (sf - 1) * fade);
+  C1 *= 1 - 0.35 * smoother((L1 - 0.88) / 0.12);
+  let h1 = h;
+  const cw = smoother(C / 0.06) * fade;
+  for (let i = 0; i < 7; i++) if (P.rot[i]) h1 += P.rot[i] * D2R * gaussH(h, HUES[i][1], 30) * cw;
+  let a1 = C1 * Math.cos(h1), b1 = C1 * Math.sin(h1);
+  const ws = (1 - L1) ** 2.4, wh = L1 ** 2.6, wm = 4 * L1 * (1 - L1);
+  const skin = 1 - P.skin * gaussH(h, 55, 22) * smoother(C / 0.05);
+  a1 += skin * (P.shAmt * Math.cos(P.shHue * D2R) * ws + P.hiAmt * Math.cos(P.hiHue * D2R) * wh + P.miAmt * Math.cos(P.miHue * D2R) * wm);
+  b1 += skin * (P.shAmt * Math.sin(P.shHue * D2R) * ws + P.hiAmt * Math.sin(P.hiHue * D2R) * wh + P.miAmt * Math.sin(P.miHue * D2R) * wm);
+  return gamutMap(L1, a1, b1);
+}
+
+// ---------- LUT ops ----------
+function sampleBase(r, g, b) {                       // r,g,b in 0..1 -> trilinear sample of 64^3 base
+  const f = [r, g, b].map(v => Math.min(1, Math.max(0, v)) * (N - 1));
+  const i0 = f.map(Math.floor), i1 = i0.map(v => Math.min(v + 1, N - 1)), t = f.map((v, k) => v - i0[k]);
+  const out = [0, 0, 0];
+  for (let c = 0; c < 8; c++) {
+    const ir = c & 1 ? i1[0] : i0[0], ig = c & 2 ? i1[1] : i0[1], ib = c & 4 ? i1[2] : i0[2];
+    const w = (c & 1 ? t[0] : 1 - t[0]) * (c & 2 ? t[1] : 1 - t[1]) * (c & 4 ? t[2] : 1 - t[2]);
+    const o = ((ib * N + ig) * N + ir) * 3;
+    out[0] += w * baseData[o]; out[1] += w * baseData[o + 1]; out[2] += w * baseData[o + 2];
+  }
+  return out;
+}
+function buildLut(size, withGrade) {
+  const lut = new Float32Array(size ** 3 * 3); let o = 0;
+  for (let b = 0; b < size; b++) for (let g = 0; g < size; g++) for (let r = 0; r < size; r++) {
+    let c = sampleBase(r / (size - 1), g / (size - 1), b / (size - 1));
+    if (withGrade) c = grade(c[0], c[1], c[2]);
+    lut[o++] = c[0]; lut[o++] = c[1]; lut[o++] = c[2];
+  }
+  return lut;
+}
+function applyLut(lut, size, src, dst) {                // ImageData src -> dst
+  const s = src.data, d = dst.data, m = size - 1, S2 = size * size;
+  for (let p = 0; p < s.length; p += 4) {
+    const fr = s[p] / 255 * m, fg = s[p + 1] / 255 * m, fb = s[p + 2] / 255 * m;
+    const r0 = fr | 0, g0 = fg | 0, b0 = fb | 0, r1 = Math.min(r0 + 1, m), g1 = Math.min(g0 + 1, m), b1 = Math.min(b0 + 1, m);
+    const tr = fr - r0, tg = fg - g0, tb = fb - b0;
+    for (let k = 0; k < 3; k++) {
+      const c000 = lut[((b0 * size + g0) * size + r0) * 3 + k], c100 = lut[((b0 * size + g0) * size + r1) * 3 + k];
+      const c010 = lut[((b0 * size + g1) * size + r0) * 3 + k], c110 = lut[((b0 * size + g1) * size + r1) * 3 + k];
+      const c001 = lut[((b1 * size + g0) * size + r0) * 3 + k], c101 = lut[((b1 * size + g0) * size + r1) * 3 + k];
+      const c011 = lut[((b1 * size + g1) * size + r0) * 3 + k], c111 = lut[((b1 * size + g1) * size + r1) * 3 + k];
+      const x00 = c000 + (c100 - c000) * tr, x10 = c010 + (c110 - c010) * tr, x01 = c001 + (c101 - c001) * tr, x11 = c011 + (c111 - c011) * tr;
+      const y0 = x00 + (x10 - x00) * tg, y1 = x01 + (x11 - x01) * tg;
+      d[p + k] = (y0 + (y1 - y0) * tb) * 255 + 0.5;
+    }
+    d[p + 3] = 255;
+  }
+}
+
+// ---------- UI ----------
+const $ = id => document.getElementById(id);
+const outC = $("out"), outX = outC.getContext("2d");
+let srcImg = null;                                       // ImageData (<=900 px)
+function makeSlider(host, key, label, min, max, step) {
+  const row = document.createElement("div"); row.className = "s";
+  row.innerHTML = `<label>${label}</label><input type="range" min="${min}" max="${max}" step="${step}"><output></output>`;
+  const inp = row.querySelector("input"), out = row.querySelector("output");
+  inp.addEventListener("input", () => { P[key] = +inp.value; out.textContent = (+inp.value).toFixed(step < 0.01 ? 3 : step < 1 ? 2 : 0); schedule(); });
+  row._sync = () => { inp.value = P[key]; out.textContent = (+P[key]).toFixed(step < 0.01 ? 3 : step < 1 ? 2 : 0); };
+  host.appendChild(row); return row;
+}
+const syncs = [];
+for (const [grp, list] of Object.entries(SLIDERS)) for (const x of list) syncs.push(makeSlider($("g-" + grp), ...x));
+HUES.forEach(([nm, , col], i) => {
+  const row = document.createElement("div"); row.className = "hue";
+  row.innerHTML = `<span><i class="dot" style="background:${col}"></i>${nm}</span><input type="range" min="-0.4" max="0.4" step="0.01"><input type="range" min="-30" max="30" step="1">`;
+  const [gi, ri] = row.querySelectorAll("input");
+  gi.addEventListener("input", () => { P.gain[i] = +gi.value; schedule(); });
+  ri.addEventListener("input", () => { P.rot[i] = +ri.value; schedule(); });
+  row._sync = () => { gi.value = P.gain[i]; ri.value = P.rot[i]; };
+  $("g-hue").appendChild(row); syncs.push(row);
+});
+const syncAll = () => syncs.forEach(r => r._sync());
+
+for (const id of Object.keys(BASES)) { const o = document.createElement("option"); o.value = id; o.textContent = "Base: " + BASES[id].label; $("base").appendChild(o); }
+for (const nm of Object.keys(PRESETS)) { const o = document.createElement("option"); o.value = nm; o.textContent = nm; $("preset").appendChild(o); }
+$("preset").value = "Sodium Dusk";
+
+function setPreset(nm) { P = Object.assign(JSON.parse(JSON.stringify(DEFAULT)), JSON.parse(JSON.stringify(PRESETS[nm]))); syncAll(); schedule();
+  $("desc").textContent = DESC[nm] || ""; $("name").value = nm.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""); }
+$("preset").addEventListener("change", e => setPreset(e.target.value));
+$("base").addEventListener("change", e => loadBase(e.target.value));
+
+function loadBase(id) {
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas"); c.width = c.height = 512;
+      const x = c.getContext("2d", { willReadFrequently: true }); x.drawImage(img, 0, 0);
+      const d = x.getImageData(0, 0, 512, 512).data;
+      baseData = new Float32Array(N ** 3 * 3);
+      for (let b = 0; b < N; b++) { const ty = (b / 8) | 0, tx = b % 8;
+        for (let g = 0; g < N; g++) for (let r = 0; r < N; r++) {
+          const p = ((ty * N + g) * 512 + tx * N + r) * 4, o = ((b * N + g) * N + r) * 3;
+          baseData[o] = d[p] / 255; baseData[o + 1] = d[p + 1] / 255; baseData[o + 2] = d[p + 2] / 255;
+        } }
+      baseId = id; schedule(); res();
+    };
+    img.src = BASES[id].uri;
+  });
+}
+function identityBase() { baseData = new Float32Array(N ** 3 * 3); let o = 0;
+  for (let b = 0; b < N; b++) for (let g = 0; g < N; g++) for (let r = 0; r < N; r++) { baseData[o++] = r / 63; baseData[o++] = g / 63; baseData[o++] = b / 63; } }
+
+let pending = false;
+function schedule() { if (!pending) { pending = true; requestAnimationFrame(() => { pending = false; render(); }); } }
+function render() {
+  if (!baseData || !srcImg) return;
+  const t0 = performance.now();
+  const lut = buildLut(33, !hold);
+  const dst = outX.createImageData(srcImg.width, srcImg.height);
+  applyLut(lut, 33, srcImg, dst);
+  outC.width = srcImg.width; outC.height = srcImg.height; outX.putImageData(dst, 0, 0);
+  strips(lut);
+  $("msg").textContent = (hold ? "Showing base look · " : "") + Math.round(performance.now() - t0) + " ms";
+}
+function strips(lut) {
+  const base = buildLut(33, false);
+  for (const [id, mk] of [["ramp", (x, w) => { const v = x / w * 255; return [v, v, v]; }],
+                          ["chart", (x, w, y, h) => { const hh = x / w * 360, l = 0.25 + 0.6 * (1 - y / h);
+                             const a = 0.11 * Math.cos(hh * D2R), b = 0.11 * Math.sin(hh * D2R); return gamutMap(l, a, b).map(v => v * 255); }]]) {
+    const c = $(id), x = c.getContext("2d"), w = c.width, h = c.height, im = x.createImageData(w, h), im2 = x.createImageData(w, h);
+    for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) { const p = (yy * w + xx) * 4, v = mk(xx, w, yy, h);
+      im.data[p] = v[0]; im.data[p + 1] = v[1]; im.data[p + 2] = v[2]; im.data[p + 3] = 255; }
+    const half = h / 2 | 0; const topIn = new ImageData(new Uint8ClampedArray(im.data.slice(0, half * w * 4)), w, half);
+    const botIn = new ImageData(new Uint8ClampedArray(im.data.slice(half * w * 4)), w, h - half);
+    const a = x.createImageData(w, half), b = x.createImageData(w, h - half);
+    applyLut(base, 33, topIn, a); applyLut(lut, 33, botIn, b);
+    x.putImageData(a, 0, 0); x.putImageData(b, 0, half);
+  }
+}
+
+function setImage(img) {
+  const s = Math.min(1, 900 / Math.max(img.width, img.height));
+  const c = document.createElement("canvas"); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+  const x = c.getContext("2d", { willReadFrequently: true }); x.drawImage(img, 0, 0, c.width, c.height);
+  srcImg = x.getImageData(0, 0, c.width, c.height); schedule();
+}
+function demoImage() {
+  const W = 720, H = 480, c = document.createElement("canvas"); c.width = W; c.height = H; const x = c.getContext("2d");
+  let g = x.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, "#3b6fd0"); g.addColorStop(1, "#f2d9b8"); x.fillStyle = g; x.fillRect(0, 0, W, 300);
+  x.fillStyle = "#2f5a22"; x.beginPath(); x.moveTo(0, 300); for (let i = 0; i <= W; i += 10) x.lineTo(i, 270 + 25 * Math.sin(i / 60)); x.lineTo(W, 300); x.fill();
+  x.fillStyle = "#ffe9a8"; x.fillRect(60, 120, 90, 70);
+  [["#f3d3c0"], ["#d9a583"], ["#a97455"], ["#6f4a38"], ["#45291e"]].forEach((k, i) => { x.fillStyle = k[0]; x.fillRect(20 + i * 70, 310, 66, 64); });
+  ["#e23b3b", "#f08a24", "#f1d84a", "#3fae49", "#2ac4c4", "#3560e8", "#9b3fd1", "#e449a8"].forEach((k, i) => { x.fillStyle = k; x.fillRect(400 + (i % 4) * 78, 310 + ((i / 4) | 0) * 32, 74, 28); });
+  g = x.createLinearGradient(0, 0, W, 0); g.addColorStop(0, "#000"); g.addColorStop(1, "#fff"); x.fillStyle = g; x.fillRect(0, 380, W, 34);
+  g = x.createLinearGradient(0, 414, 0, H); g.addColorStop(0, "#10182a"); g.addColorStop(1, "#1d2a44"); x.fillStyle = g; x.fillRect(0, 414, W, H - 414);
+  [[120, 445, "#ffb866"], [260, 440, "#ff5d86"], [400, 450, "#6fd4ff"], [560, 445, "#fff3d0"], [660, 442, "#ff9a3c"]].forEach(([px, py, col]) => {
+    const r = x.createRadialGradient(px, py, 0, px, py, 26); r.addColorStop(0, col); r.addColorStop(1, "transparent"); x.fillStyle = r; x.fillRect(px - 30, py - 30, 60, 60); });
+  const img = new Image(); img.onload = () => setImage(img); img.src = c.toDataURL();
+}
+$("demo").onclick = demoImage;
+$("open").onclick = () => $("file").click();
+$("file").onchange = e => { const f = e.target.files[0]; if (!f) return; const u = URL.createObjectURL(f); const i = new Image(); i.onload = () => { setImage(i); URL.revokeObjectURL(u); }; i.src = u; };
+const holdOn = v => () => { hold = v; schedule(); };
+$("hold").addEventListener("mousedown", holdOn(true)); window.addEventListener("mouseup", holdOn(false));
+$("hold").addEventListener("touchstart", holdOn(true)); $("hold").addEventListener("touchend", holdOn(false));
+
+// ---------- export ----------
+function download(blob, name) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
+const nm = () => ($("name").value.trim().replace(/[^\w.-]+/g, "_") || "my_look");
+$("expPng").onclick = () => {
+  $("msg").textContent = "Building 64³ LUT…";
+  setTimeout(() => {
+    const lut = buildLut(64, true), c = document.createElement("canvas"); c.width = c.height = 512;
+    const x = c.getContext("2d"), im = x.createImageData(512, 512);
+    for (let b = 0; b < N; b++) { const ty = (b / 8) | 0, tx = b % 8;
+      for (let g = 0; g < N; g++) for (let r = 0; r < N; r++) {
+        const p = ((ty * N + g) * 512 + tx * N + r) * 4, o = ((b * N + g) * N + r) * 3;
+        im.data[p] = lut[o] * 255 + 0.5; im.data[p + 1] = lut[o + 1] * 255 + 0.5; im.data[p + 2] = lut[o + 2] * 255 + 0.5; im.data[p + 3] = 255;
+      } }
+    x.putImageData(im, 0, 0);
+    c.toBlob(bl => { download(bl, nm() + ".lut.png"); $("msg").textContent = "Saved " + nm() + ".lut.png"; }, "image/png");
+  }, 20);
+};
+$("expCube").onclick = () => {
+  $("msg").textContent = "Building .cube…";
+  setTimeout(() => {
+    const lut = buildLut(64, true), parts = [`TITLE "${nm()}"\nLUT_3D_SIZE 64\nDOMAIN_MIN 0 0 0\nDOMAIN_MAX 1 1 1\n`];
+    for (let i = 0; i < lut.length; i += 3) parts.push(lut[i].toFixed(6) + " " + lut[i + 1].toFixed(6) + " " + lut[i + 2].toFixed(6) + "\n");
+    download(new Blob(parts, { type: "text/plain" }), nm() + ".cube"); $("msg").textContent = "Saved " + nm() + ".cube";
+  }, 20);
+};
+$("expJson").onclick = () => download(new Blob([JSON.stringify({ base: baseId, params: P }, null, 1)], { type: "application/json" }), nm() + ".preset.json");
+$("impJson").onclick = () => $("jsonFile").click();
+$("jsonFile").onchange = async e => { const f = e.target.files[0]; if (!f) return; try { const j = JSON.parse(await f.text());
+  if (j.base && BASES[j.base]) { $("base").value = j.base; await loadBase(j.base); }
+  P = Object.assign(JSON.parse(JSON.stringify(DEFAULT)), j.params); syncAll(); schedule(); } catch (err) { $("msg").textContent = "Bad preset file"; } };
+
+// ---------- randomizer (seeded, so a look can be shared by its seed number) ----------
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function randomLook(seed, nudgeFrom) {
+  const R = mulberry32(seed), u = (a, b) => a + (b - a) * R(), pick = arr => arr[(R() * arr.length) | 0];
+  const q = JSON.parse(JSON.stringify(DEFAULT));
+  const mono = R() < 0.08;
+  q.lift = u(0.0, 0.13); q.contrast = u(0.1, 0.85); q.pivot = u(0.54, 0.66); q.knee = u(0.7, 0.86); q.white = u(0.975, 1);
+  q.sat = mono ? 0 : u(0.78, 1.22);
+  // tints: shadows and highlights roughly complementary, so the look reads as intentional
+  q.shHue = u(0, 360); q.shAmt = u(0.004, 0.032);
+  q.hiHue = (q.shHue + 180 + u(-50, 50) + 360) % 360; q.hiAmt = u(0.004, 0.03);
+  q.miHue = u(0, 360); q.miAmt = R() < 0.5 ? u(0, 0.008) : 0;
+  q.skin = u(0.45, 0.9);
+  if (!mono) {
+    const n = 2 + ((R() * 3) | 0);
+    for (let i = 0; i < n; i++) { const k = (R() * 7) | 0; q.gain[k] = u(-0.2, 0.22); }
+    const m = 1 + ((R() * 2) | 0);
+    for (let i = 0; i < m; i++) { const k = (R() * 7) | 0; q.rot[k] = Math.round(u(-14, 14)); }
+  } else { q.skin = 0; q.contrast = u(0.4, 1.0); }
+  if (nudgeFrom) {                                   // blend a fresh random look 25% into the current one
+    const mix = (a, b) => a + (b - a) * 0.25, ang = (a, b) => (a + (((b - a + 540) % 360) - 180) * 0.25 + 360) % 360;
+    const o = JSON.parse(JSON.stringify(nudgeFrom));
+    for (const k of ["lift", "contrast", "pivot", "knee", "white", "sat", "shAmt", "miAmt", "hiAmt", "skin"]) o[k] = mix(o[k], q[k]);
+    for (const k of ["shHue", "miHue", "hiHue"]) o[k] = ang(o[k], q[k]);
+    o.gain = o.gain.map((v, i) => mix(v, q.gain[i])); o.rot = o.rot.map((v, i) => Math.round(mix(v, q.rot[i])));
+    return o;
+  }
+  return q;
+}
+function applyRandom(seed, nudge) {
+  P = randomLook(seed, nudge ? P : null); $("seed").value = seed; syncAll(); schedule();
+  $("desc").textContent = nudge ? "Nudged from the previous look." : "Random look, seed " + seed + ". Type this seed to get it back.";
+  $("name").value = "random_" + seed;
+}
+$("rand").onclick = () => applyRandom((Math.random() * 1e6) | 0, false);
+$("nudge").onclick = () => applyRandom((Math.random() * 1e6) | 0, true);
+$("seed").addEventListener("change", e => { const v = parseInt(e.target.value, 10); if (!isNaN(v)) applyRandom(v, false); });
+window.addEventListener("keydown", e => { if (e.code === "Space" && !/INPUT|SELECT|BUTTON/.test(document.activeElement.tagName)) { e.preventDefault(); $("rand").click(); } });
+
+// ---------- boot ----------
+(async () => { const b0 = BASES.classic ? "classic" : Object.keys(BASES)[0]; $("base").value = b0; await loadBase(b0); setPreset("Sodium Dusk"); demoImage(); })();
+</script>
+</body>
+</html>
