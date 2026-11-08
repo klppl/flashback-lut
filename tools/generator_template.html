@@ -123,7 +123,7 @@
       <li>Leave the base on <b>Classic v12</b> (or pick another).</li>
       <li>Choose a preset, or hit <b>Randomize</b>. The seed number reproduces a random look.</li>
       <li>Drag the divider on the photo to compare base and graded. Tweak the sliders.</li>
-      <li><b>Export LUT</b>, AirDrop the <code>.lut.png</code> to your iPhone (Files app) and import it in the Flashback app.</li>
+      <li><b>Export LUT</b>, sync the <code>.lut.png</code> to your phone and import it in the Flashback app.</li>
     </ol>
 
     <h3>Controls</h3>
@@ -608,7 +608,7 @@ $("expPng").onclick = () => {
         im.data[p] = lut[o] * 255 + 0.5; im.data[p + 1] = lut[o + 1] * 255 + 0.5; im.data[p + 2] = lut[o + 2] * 255 + 0.5; im.data[p + 3] = 255;
       } }
     x.putImageData(im, 0, 0);
-    c.toBlob(bl => { download(bl, nm() + ".lut.png"); toast("✓ Downloaded " + nm() + ".lut.png. AirDrop it to your iPhone and import it in the Flashback app."); }, "image/png");
+    c.toBlob(bl => { download(bl, nm() + ".lut.png"); toast("✓ Downloaded " + nm() + ".lut.png. Sync it to your phone and import it in the Flashback app."); }, "image/png");
   }, 20);
 };
 $("expCube").onclick = () => {

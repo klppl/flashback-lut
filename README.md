@@ -13,7 +13,7 @@ The camera can't load LUTs; the phone app applies them. This tool only makes the
 1. Open the page, leave the base on **Classic v12**, pick a preset or hit **Randomize**.
 2. Drag the divider on the demo photo (or **Open photo…** for your own) to compare, and tweak the sliders.
 3. **Export LUT** and save the `.lut.png`.
-4. AirDrop or sync it to your iPhone (Files app) and import it in the Flashback app.
+4. Sync the file to your phone and import it in the Flashback app.
 
 ## What it does
 
